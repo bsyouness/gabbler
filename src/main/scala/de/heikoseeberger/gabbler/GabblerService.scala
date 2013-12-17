@@ -16,7 +16,7 @@
 
 package de.heikoseeberger.gabbler
 
-import akka.actor.{ ActorLogging, Props }
+import akka.actor.{ ActorLogging, ActorRef, Props }
 import akka.io.IO
 import scala.concurrent.duration.DurationInt
 import spray.can.Http
@@ -53,13 +53,17 @@ class GabblerService(hostname: String, port: Int) extends HttpServiceActor with 
     authenticate(BasicAuth(UsernameEqualsPasswordAuthenticator, "Gabbler")) { user =>
       pathPrefix("api") {
         path("messages") {
-          get { context =>
-            log.debug("User {} is asking for messages ...", user.username)
+          get {
+            produce(instanceOf[Seq[Message]]) { completer => _ =>
+              log.debug("User {} is asking for messages ...", user.username)
+              gabblerFor(user.username) ! completer
+            }
           } ~
           post {
             entity(as[Message]) { message =>
               complete {
                 log.debug("User '{}' has posted '{}'", user.username, message.text)
+                context.children foreach (_ ! message)
                 StatusCodes.NoContent
               }
             }
@@ -83,4 +87,7 @@ class GabblerService(hostname: String, port: Int) extends HttpServiceActor with 
       getFromResource("web/index.html")
     } ~
     getFromResourceDirectory("web") // format: ON
+
+  def gabblerFor(username: String): ActorRef =
+    context.child(username) getOrElse context.actorOf(Gabbler.props, username)
 }
