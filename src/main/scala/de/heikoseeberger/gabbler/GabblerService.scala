@@ -35,7 +35,7 @@ class GabblerService(hostname: String, port: Int) extends HttpServiceActor with 
   IO(Http)(context.system) ! Http.Bind(self, hostname, port) // For details see my blog post http://goo.gl/XwOv7P
 
   override def receive: Receive =
-    runRoute(apiRoute)
+    runRoute(apiRoute ~ staticRoute)
 
   def apiRoute: Route =
     pathPrefix("api") {
@@ -49,4 +49,11 @@ class GabblerService(hostname: String, port: Int) extends HttpServiceActor with 
         }
       }
     }
+
+  def staticRoute: Route =
+    // format: OFF
+    path("") {
+      getFromResource("web/index.html")
+    } ~
+    getFromResourceDirectory("web") // format: ON
 }
