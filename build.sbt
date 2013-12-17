@@ -2,9 +2,11 @@ organization := "name.heikoseeberger"
 
 name := "gabbler"
 
-version := "0.1.0"
+version := "2.0.0"
 
 scalaVersion := Version.scala
+
+resolvers += "spray repo" at "http://repo.spray.io"
 
 libraryDependencies ++= Dependencies.gabbler
 
