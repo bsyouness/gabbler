@@ -25,7 +25,8 @@ object GabblerServiceApp {
 
     val hostname = Settings(system).hostname
     val port = Settings(system).port
-    system.actorOf(GabblerService.props(hostname, port), "gabbler-service")
+    val timeout = Settings(system).timeout
+    system.actorOf(GabblerService.props(hostname, port, timeout), "gabbler-service")
 
     system.awaitTermination()
   }
