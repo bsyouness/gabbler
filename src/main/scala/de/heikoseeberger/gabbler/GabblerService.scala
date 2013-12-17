@@ -24,6 +24,7 @@ import spray.http.StatusCodes
 import spray.httpx.SprayJsonSupport
 import spray.json.DefaultJsonProtocol
 import spray.routing.{ HttpServiceActor, Route }
+import spray.routing.authentication.BasicAuth
 
 object GabblerService {
 
@@ -49,26 +50,28 @@ class GabblerService(hostname: String, port: Int) extends HttpServiceActor with 
 
   def apiRoute: Route =
     // format: OFF
-    pathPrefix("api") {
-      path("messages") {
-        get { context =>
-          log.debug("User {} is asking for messages ...", "TODO")
-        } ~
-        post {
-          entity(as[Message]) { message =>
-            complete {
-              log.debug("User '{}' has posted '{}'", "TODO", message.text)
-              StatusCodes.NoContent
+    authenticate(BasicAuth(UsernameEqualsPasswordAuthenticator, "Gabbler")) { user =>
+      pathPrefix("api") {
+        path("messages") {
+          get { context =>
+            log.debug("User {} is asking for messages ...", user.username)
+          } ~
+          post {
+            entity(as[Message]) { message =>
+              complete {
+                log.debug("User '{}' has posted '{}'", user.username, message.text)
+                StatusCodes.NoContent
+              }
             }
           }
-        }
-      } ~
-      path("shutdown") {
-        get {
-          complete {
-            val system = context.system
-            system.scheduler.scheduleOnce(1 second)(system.shutdown())
-            "Shutting down in 1 second ..."
+        } ~
+        path("shutdown") {
+          get {
+            complete {
+              val system = context.system
+              system.scheduler.scheduleOnce(1 second)(system.shutdown())
+              "Shutting down in 1 second ..."
+            }
           }
         }
       }
