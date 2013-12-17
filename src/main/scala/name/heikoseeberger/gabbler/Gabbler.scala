@@ -18,16 +18,17 @@ package name.heikoseeberger.gabbler
 
 import GabblerService.Message
 import akka.actor.{ Actor, Props }
+import scala.concurrent.duration.FiniteDuration
 
 object Gabbler {
 
   type Completer = Seq[Message] => Unit
 
-  def props: Props =
-    Props(new Gabbler)
+  def props(timeoutDuration: FiniteDuration): Props =
+    Props(new Gabbler(timeoutDuration))
 }
 
-class Gabbler extends Actor {
+class Gabbler(timeoutDuration: FiniteDuration) extends Actor {
 
   import Gabbler._
 

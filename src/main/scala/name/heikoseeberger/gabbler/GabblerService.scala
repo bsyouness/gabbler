@@ -18,7 +18,7 @@ package name.heikoseeberger.gabbler
 
 import akka.actor.{ ActorLogging, ActorRef, Props }
 import akka.io.IO
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{ DurationInt, FiniteDuration }
 import spray.can.Http
 import spray.http.StatusCodes
 import spray.httpx.SprayJsonSupport
@@ -34,11 +34,12 @@ object GabblerService {
 
   case class Message(username: String, text: String)
 
-  def props(hostname: String, port: Int): Props =
-    Props(new GabblerService(hostname, port))
+  def props(hostname: String, port: Int, timeout: FiniteDuration): Props =
+    Props(new GabblerService(hostname, port, timeout))
 }
 
-class GabblerService(hostname: String, port: Int) extends HttpServiceActor with ActorLogging with SprayJsonSupport {
+class GabblerService(hostname: String, port: Int, timeout: FiniteDuration) extends HttpServiceActor
+    with ActorLogging with SprayJsonSupport {
 
   import GabblerService._
   import context.dispatcher
@@ -89,5 +90,5 @@ class GabblerService(hostname: String, port: Int) extends HttpServiceActor with 
     getFromResourceDirectory("web") // format: ON
 
   def gabblerFor(username: String): ActorRef =
-    context.child(username) getOrElse context.actorOf(Gabbler.props, username)
+    context.child(username) getOrElse context.actorOf(Gabbler.props(timeout), username)
 }
