@@ -24,6 +24,8 @@ object Gabbler {
 
   type Completer = Seq[Message] => Unit
 
+  case class Timeout(id: Int)
+
   def props(timeoutDuration: FiniteDuration): Props =
     Props(new Gabbler(timeoutDuration))
 }
@@ -31,27 +33,39 @@ object Gabbler {
 class Gabbler(timeoutDuration: FiniteDuration) extends Actor {
 
   import Gabbler._
+  import context.dispatcher
 
   def receive: Receive =
-    waiting
+    waiting(scheduleTimeout(Timeout(0)))
 
-  def waiting: Receive = {
-    case completer: Completer => context become waitingForMessage(completer)
+  def waiting(implicit timeout: Timeout): Receive = {
+    case completer: Completer => context become waitingForMessage(completer)(newTimeout(timeout))
     case message: Message     => context become waitingForCompleter(message +: Nil)
+    case `timeout`            => context.stop(self)
   }
 
-  def waitingForMessage(completer: Completer): Receive = {
-    case completer: Completer => waitingForMessage(completer)
+  def waitingForMessage(completer: Completer)(implicit timeout: Timeout): Receive = {
+    case completer: Completer => waitingForMessage(completer)(newTimeout(timeout))
     case message: Message     => completeAndWait(completer, message +: Nil)
+    case `timeout`            => completeAndWait(completer, Nil)
   }
 
-  def waitingForCompleter(messages: Seq[Message]): Receive = {
+  def waitingForCompleter(messages: Seq[Message])(implicit timeout: Timeout): Receive = {
     case completer: Completer => completeAndWait(completer, messages)
     case message: Message     => waitingForCompleter(message +: messages)
+    case `timeout`            => context.stop(self)
   }
 
-  def completeAndWait(completer: Completer, messages: Seq[Message]): Unit = {
+  def completeAndWait(completer: Completer, messages: Seq[Message])(implicit timeout: Timeout): Unit = {
     completer(messages)
-    context become waiting
+    context become waiting(newTimeout(timeout))
+  }
+
+  def newTimeout(timeout: Timeout): Timeout =
+    scheduleTimeout(timeout.copy(timeout.id + 1))
+
+  def scheduleTimeout(timeout: Timeout): Timeout = {
+    context.system.scheduler.scheduleOnce(timeoutDuration, self, timeout)
+    timeout
   }
 }
