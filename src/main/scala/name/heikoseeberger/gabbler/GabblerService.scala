@@ -43,7 +43,13 @@ class GabblerService(hostname: String, port: Int) extends HttpServiceActor with 
     runRoute(apiRoute ~ staticRoute)
 
   def apiRoute: Route =
+    // format: OFF
     pathPrefix("api") {
+      path("messages") {
+        get { context =>
+          log.debug("User {} is asking for messages ...", "TODO")
+        }
+      } ~
       path("shutdown") {
         get {
           complete {
@@ -53,7 +59,7 @@ class GabblerService(hostname: String, port: Int) extends HttpServiceActor with 
           }
         }
       }
-    }
+    } // format: ON
 
   def staticRoute: Route =
     // format: OFF
