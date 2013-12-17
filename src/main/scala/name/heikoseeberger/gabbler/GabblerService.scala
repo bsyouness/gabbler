@@ -28,11 +28,17 @@ import spray.routing.authentication.BasicAuth
 
 object GabblerService {
 
+  object Message extends DefaultJsonProtocol {
+    implicit val format = jsonFormat2(apply)
+  }
+
+  case class Message(username: String, text: String)
+
   def props(hostname: String, port: Int): Props =
     Props(new GabblerService(hostname, port))
 }
 
-class GabblerService(hostname: String, port: Int) extends HttpServiceActor with ActorLogging {
+class GabblerService(hostname: String, port: Int) extends HttpServiceActor with ActorLogging with SprayJsonSupport {
 
   import GabblerService._
   import context.dispatcher
@@ -48,6 +54,14 @@ class GabblerService(hostname: String, port: Int) extends HttpServiceActor with 
       path("messages") {
         get { context =>
           log.debug("User {} is asking for messages ...", "TODO")
+        } ~
+        post {
+          entity(as[Message]) { message =>
+            complete {
+              log.debug("User '{}' has posted '{}'", "TODO", message.text)
+              StatusCodes.NoContent
+            }
+          }
         }
       } ~
       path("shutdown") {
