@@ -37,6 +37,21 @@ class GabblerService(hostname: String, port: Int) extends HttpServiceActor with 
   import GabblerService._
   import context.dispatcher
 
+  IO(Http)(context.system) ! Http.Bind(self, hostname, port) // For details see my blog post http://goo.gl/XwOv7P
+
   override def receive: Receive =
-    Map.empty
+    runRoute(apiRoute)
+
+  def apiRoute: Route =
+    pathPrefix("api") {
+      path("shutdown") {
+        get {
+          complete {
+            val system = context.system
+            system.scheduler.scheduleOnce(1 second)(system.shutdown())
+            "Shutting down in 1 second ..."
+          }
+        }
+      }
+    }
 }
