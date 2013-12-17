@@ -31,23 +31,26 @@ class Gabbler extends Actor {
 
   import Gabbler._
 
-  var messages = List.empty[Message]
+  def receive: Receive =
+    waiting
 
-  var storedCompleter = Option.empty[Completer]
+  def waiting: Receive = {
+    case completer: Completer => context become waitingForMessage(completer)
+    case message: Message     => context become waitingForCompleter(message +: Nil)
+  }
 
-  def receive: Receive = {
-    case completer: Completer =>
-      if (messages.nonEmpty) {
-        completer(messages)
-        messages = Nil
-      } else
-        storedCompleter = Some(completer)
-    case message: Message =>
-      messages +:= message
-      for (completer <- storedCompleter) {
-        completer(messages)
-        messages = Nil
-        storedCompleter = None
-      }
+  def waitingForMessage(completer: Completer): Receive = {
+    case completer: Completer => waitingForMessage(completer)
+    case message: Message     => completeAndWait(completer, message +: Nil)
+  }
+
+  def waitingForCompleter(messages: Seq[Message]): Receive = {
+    case completer: Completer => completeAndWait(completer, messages)
+    case message: Message     => waitingForCompleter(message +: messages)
+  }
+
+  def completeAndWait(completer: Completer, messages: Seq[Message]): Unit = {
+    completer(messages)
+    context become waiting
   }
 }
