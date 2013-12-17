@@ -21,6 +21,8 @@ import akka.actor.{ Actor, Props }
 
 object Gabbler {
 
+  type Completer = Seq[Message] => Unit
+
   def props: Props =
     Props(new Gabbler)
 }
@@ -29,6 +31,23 @@ class Gabbler extends Actor {
 
   import Gabbler._
 
-  def receive: Receive =
-    Actor.emptyBehavior
+  var messages = List.empty[Message]
+
+  var storedCompleter = Option.empty[Completer]
+
+  def receive: Receive = {
+    case completer: Completer =>
+      if (messages.nonEmpty) {
+        completer(messages)
+        messages = Nil
+      } else
+        storedCompleter = Some(completer)
+    case message: Message =>
+      messages +:= message
+      for (completer <- storedCompleter) {
+        completer(messages)
+        messages = Nil
+        storedCompleter = None
+      }
+  }
 }
