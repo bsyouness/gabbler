@@ -16,8 +16,11 @@
 
 package de.heikoseeberger.gabbler
 
-import akka.actor.{ Actor, ActorLogging, Props }
-import spray.routing.HttpServiceActor
+import akka.actor.{ ActorLogging, Props }
+import akka.io.IO
+import scala.concurrent.duration.DurationInt
+import spray.can.Http
+import spray.routing.{ HttpServiceActor, Route }
 
 object GabblerService {
 
@@ -27,6 +30,23 @@ object GabblerService {
 
 class GabblerService(hostname: String, port: Int) extends HttpServiceActor with ActorLogging {
 
+  import context.dispatcher
+
+  IO(Http)(context.system) ! Http.Bind(self, hostname, port) // For details see my blog post http://goo.gl/XwOv7P
+
   override def receive: Receive =
-    Actor.emptyBehavior
+    runRoute(apiRoute)
+
+  def apiRoute: Route =
+    pathPrefix("api") {
+      path("shutdown") {
+        get {
+          complete {
+            val system = context.system
+            system.scheduler.scheduleOnce(1 second)(system.shutdown())
+            "Shutting down in 1 second ..."
+          }
+        }
+      }
+    }
 }
