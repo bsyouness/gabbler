@@ -17,55 +17,65 @@
 package name.heikoseeberger.gabbler
 
 import GabblerService.Message
-import akka.actor.{ Actor, Props }
+import akka.actor.{ Actor, FSM, Props }
 import scala.concurrent.duration.FiniteDuration
 
 object Gabbler {
 
   type Completer = Seq[Message] => Unit
 
-  case class Timeout(id: Int)
+  sealed trait State
+
+  object State {
+    case object Waiting extends State
+    case object WaitingForMessage extends State
+    case object WaitingForCompleter extends State
+  }
+
+  private case object Timeout
 
   def props(timeoutDuration: FiniteDuration): Props =
     Props(new Gabbler(timeoutDuration))
 }
 
-class Gabbler(timeoutDuration: FiniteDuration) extends Actor {
+import Gabbler._
+import State._
 
-  import Gabbler._
-  import context.dispatcher
+final class Gabbler(timeoutDuration: FiniteDuration) extends Actor with FSM[State, (Option[Completer], Seq[Message])] {
 
-  def receive: Receive =
-    waiting(scheduleTimeout(Timeout(0)))
+  startWith(Waiting, (None, Nil))
 
-  def waiting(implicit timeout: Timeout): Receive = {
-    case completer: Completer => context become waitingForMessage(completer)(newTimeout(timeout))
-    case message: Message     => context become waitingForCompleter(message +: Nil)
-    case `timeout`            => context.stop(self)
+  when(Waiting) {
+    case Event(completer: Completer, (None, Nil)) => goto(WaitingForMessage) using Some(completer) -> Nil
+    case Event(message: Message, (None, Nil))     => goto(WaitingForCompleter) using None -> (message +: Nil)
+    case Event(Timeout, _)                        => stop()
   }
 
-  def waitingForMessage(completer: Completer)(implicit timeout: Timeout): Receive = {
-    case completer: Completer => waitingForMessage(completer)(newTimeout(timeout))
-    case message: Message     => completeAndWait(completer, message +: Nil)
-    case `timeout`            => completeAndWait(completer, Nil)
+  when(WaitingForMessage) {
+    case Event(completer: Completer, (_, Nil)) =>
+      stay using Some(completer) -> Nil
+    case Event(message: Message, (Some(completer), Nil)) =>
+      completer(message +: Nil)
+      goto(Waiting) using None -> Nil
+    case Event(Timeout, (Some(completer), Nil)) =>
+      completer(Nil)
+      goto(Waiting) using None -> Nil
   }
 
-  def waitingForCompleter(messages: Seq[Message])(implicit timeout: Timeout): Receive = {
-    case completer: Completer => completeAndWait(completer, messages)
-    case message: Message     => waitingForCompleter(message +: messages)
-    case `timeout`            => context.stop(self)
+  when(WaitingForCompleter) {
+    case Event(completer: Completer, (None, messages)) =>
+      completer(messages)
+      goto(Waiting) using None -> Nil
+    case Event(message: Message, (None, messages)) =>
+      stay using None -> (message +: messages)
+    case Event(Timeout, _) =>
+      stop()
   }
 
-  def completeAndWait(completer: Completer, messages: Seq[Message])(implicit timeout: Timeout): Unit = {
-    completer(messages)
-    context become waiting(newTimeout(timeout))
+  onTransition {
+    case _ -> WaitingForMessage | _ -> Waiting => setTimeout()
   }
 
-  def newTimeout(timeout: Timeout): Timeout =
-    scheduleTimeout(timeout.copy(timeout.id + 1))
-
-  def scheduleTimeout(timeout: Timeout): Timeout = {
-    context.system.scheduler.scheduleOnce(timeoutDuration, self, timeout)
-    timeout
-  }
+  def setTimeout(): Unit =
+    setTimer("timeout", Timeout, timeoutDuration, false)
 }
