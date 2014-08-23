@@ -8,27 +8,33 @@
       <fieldset>
         <div>
           <textarea id="text-input" rows="3" placeholder="Enter your message ..."
-                    data-ng-model="message.text" required>
+                    data-ng-model="message.text" autofocus>
           </textarea>
         </div>
         <div>
-          <button type="submit" class="btn btn-primary"
-                  data-ng-click="sendMessage()" data-ng-disabled="form.$invalid">
+          <button type="submit" class="btn btn-primary {{ sending ? 'disabled' : '' }}"
+                  data-ng-click="sendMessage()">
             Gabble away
           </button>
         </div>
       </fieldset>
     </form>
+
+    <h4>Debug Info</h4>
+    <p>cursor: {{ cursor }}</p>
+    <p>firstId: {{ firstId }}</p>
+    <p>lastId: {{ lastId }}</p>
+    <p>status: {{ state }}</p>
   </div>
 
   <!--### The list of messages ###-->
   <div class="col-md-6 messages">
-    <h4 data-ng-init="getMessages()">Gibble gabble</h4>
+    <h4>Gibble gabble</h4>
 
     <div data-ng-repeat="msg in messages">
       <div class="username">{{ msg.username }}</div>
       <div class="text">{{ msg.text }}</div>
     </div>
   </div>
-
+  
 </div>

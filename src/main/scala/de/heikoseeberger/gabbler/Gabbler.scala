@@ -19,63 +19,40 @@ package de.heikoseeberger.gabbler
 import GabblerService.Message
 import akka.actor.{ Actor, FSM, Props }
 import scala.concurrent.duration.FiniteDuration
+import spray.http.StatusCode
+import akka.persistence.PersistentActor
+import spray.http.StatusCodes
+import akka.actor.ActorRef
+import akka.actor.Terminated
 
 object Gabbler {
+  case class Post(message: Message, completer: StatusCode => Unit)
 
-  type Completer = Seq[Message] => Unit
+  case class Listen(ref: ActorRef)
+  case object Update
 
-  sealed trait State
-
-  object State {
-    case object Waiting extends State
-    case object WaitingForMessage extends State
-    case object WaitingForCompleter extends State
-  }
-
-  private case object Timeout
-
-  def props(timeoutDuration: FiniteDuration): Props =
-    Props(new Gabbler(timeoutDuration))
+  def props(logId: String) = Props(new Gabbler(logId))
 }
 
-import Gabbler._
-import State._
+class Gabbler(logId: String) extends PersistentActor {
+  import Gabbler._
 
-final class Gabbler(timeoutDuration: FiniteDuration) extends Actor with FSM[State, (Option[Completer], Seq[Message])] {
+  override def persistenceId = logId
 
-  startWith(Waiting, (None, Nil))
+  /*
+   * Replayers can listen for immediate notification upon updates.
+   */
+  var listeners = Set.empty[ActorRef]
 
-  when(Waiting) {
-    case Event(completer: Completer, (None, Nil)) => goto(WaitingForMessage) using Some(completer) -> Nil
-    case Event(message: Message, (None, Nil))     => goto(WaitingForCompleter) using None -> (message +: Nil)
-    case Event(Timeout, _)                        => stop()
+  def receiveRecover = Actor.emptyBehavior
+
+  def receiveCommand = {
+    case Post(msg, completer) =>
+      persistAsync(msg) { _ =>
+        completer(StatusCodes.NoContent)
+        listeners foreach (_ ! Update)
+      }
+    case Listen(ref)     => listeners += context.watch(ref)
+    case Terminated(ref) => listeners -= ref
   }
-
-  when(WaitingForMessage) {
-    case Event(completer: Completer, (_, Nil)) =>
-      stay using Some(completer) -> Nil
-    case Event(message: Message, (Some(completer), Nil)) =>
-      completer(message +: Nil)
-      goto(Waiting) using None -> Nil
-    case Event(Timeout, (Some(completer), Nil)) =>
-      completer(Nil)
-      goto(Waiting) using None -> Nil
-  }
-
-  when(WaitingForCompleter) {
-    case Event(completer: Completer, (None, messages)) =>
-      completer(messages)
-      goto(Waiting) using None -> Nil
-    case Event(message: Message, (None, messages)) =>
-      stay using None -> (message +: messages)
-    case Event(Timeout, _) =>
-      stop()
-  }
-
-  onTransition {
-    case _ -> WaitingForMessage | _ -> Waiting => setTimeout()
-  }
-
-  def setTimeout(): Unit =
-    setTimer("timeout", Timeout, timeoutDuration, false)
 }

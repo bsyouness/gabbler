@@ -11,5 +11,11 @@ var gabblerServices =
 gabblerServices.factory(
   'Message',
   function($resource) {
-    return $resource('api/messages');
+    return $resource('/api/messages');
+  });
+
+gabblerServices.factory(
+  'Cursor',
+  function($resource) {
+    return $resource('/api/cursors/:id');
   });

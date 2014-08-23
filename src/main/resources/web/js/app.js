@@ -4,7 +4,6 @@ var gabbler =
   angular.module(
     'gabbler',
     [
-      'gabbler.services',
       'gabbler.controllers',
       'ngRoute'
     ]
