@@ -1,5 +1,7 @@
 # Gabbler #
 
+**Gabbler is dead, long live [Reactive Flows](http://github.com/hseeberger/reactive-flows)!** Gabbler is no longer relevant, because spray has been replaced by Akka HTTP. Also, instead of long polling, Server-Sent Events (or Websockets) should be used. Both issues are addressed by Reactive Flows.
+
 Gabbler is a simple push-enabled chat application showcasing a modern and reactive web application: an interactive client based on [AngularJS](http://angularjs.org) and a scalable and resilient RESTful server written in [Scala](http://www.scala-lang.org), [Akka](http://akka.io) and [spray](http://spray.io).
 
 For details check out the [Gabbler, a reactive chat app – part 1](http://hseeberger.github.io/blog/2013/07/08/gabbler-part1/) blog post and its follow-ups.
