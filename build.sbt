@@ -1,3 +1,7 @@
+import NativePackagerKeys._
+
+packageArchetype.java_application
+
 lazy val gabbler = project in file(".")
 
 name := "gabbler"
